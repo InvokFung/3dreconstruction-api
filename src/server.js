@@ -4,16 +4,13 @@ const multer = require('multer');
 const { PythonShell } = require('python-shell');
 const path = require('path');
 const fs = require('fs');
-const serverless = require('serverless-http');
+const ejs = require('ejs');
 
 const app = express();
 
 app.use(cors());
 
-app.use(express.static(path.join(__dirname, 'src')));
-app.use('/tmpImages', express.static(path.join(__dirname, 'tmpImages')));
-
-const router = express.Router();
+app.use("/", express.static('public'));
 
 // Make sure tmpImages/ folder exist
 const dir = path.join(__dirname, 'tmpImages');
@@ -38,7 +35,7 @@ const upload = multer({ storage: storage });
 
 const resultCheck = "Result path: ";
 
-router.post('/process_image/:userId', upload.array('images'), (req, res) => {
+app.post('/process_image/:userId', upload.array('images'), (req, res) => {
 
     let outputImagePath = "";
 
@@ -116,13 +113,13 @@ router.post('/process_image/:userId', upload.array('images'), (req, res) => {
     });
 });
 
-router.get('/', (req, res) => {
+app.get('/', (req, res) => {
     res.json({
         hello: 'hi!'
     });
 })
 
-router.get('/test', (req, res) => {
+app.get('/test', (req, res) => {
     res.json({
         hello: 'hi2!'
     });
@@ -142,8 +139,4 @@ router.get('/test', (req, res) => {
 //     });
 // }
 
-// app.listen(3000, () => console.log('Server started on port 3000'));
-app.use('/.netlify/functions/server', router);  // path must route to lambda
-
-module.exports = app;
-module.exports.handler = serverless(app);
+app.listen(3000, () => console.log('Server started on port 3000'));
