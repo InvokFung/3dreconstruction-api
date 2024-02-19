@@ -24,7 +24,9 @@ def savePlot(images, depthMaps, output_folder):
         ax.imshow(depthMap, cmap="gray")
         ax.axis("off")  # Hide axes
 
-    plt.savefig(f"{output_folder}/preprocess.png")
+    plotSavePath = os.path.join(output_folder, "preprocess.png")    
+    print(plotSavePath)
+    plt.savefig(plotSavePath)
 
 
 #

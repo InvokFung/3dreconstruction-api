@@ -183,6 +183,7 @@ def register_fragments(fragments, output_folder):
             pose_graph.nodes[point_id].pose
         )
     o3d.visualization.draw_geometries([accumulated_pcd])
-    o3d.io.write_point_cloud(f"{output_folder}/output.pcd", accumulated_pcd)
+    pcd_save_path = os.path.join(output_folder, "output.pcd")
+    o3d.io.write_point_cloud(pcd_save_path, accumulated_pcd)
 
-    return pcds
+    return pcd_save_path

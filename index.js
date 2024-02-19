@@ -17,6 +17,111 @@ app.use("/", express.static('public'));
 // Base directory
 const dir = path.join(__dirname, 'public');
 
+// Make sure tmpImages/ folder exist
+const tmpImgsDir = path.join(dir, 'tmpImages');
+if (!fs.existsSync(tmpImgsDir)) {
+    fs.mkdirSync(tmpImgsDir, { recursive: true });
+}
+
+// Request storage
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const userDir = path.join(dir, 'tmpImages', req.params.userId, "rgb");
+        fs.mkdirSync(userDir, { recursive: true });
+        cb(null, userDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
+const resultCheck = "Result path: ";
+
+app.post('/process_image/:userId', upload.array('images'), (req, res) => {
+
+    let outputImagePath = "";
+
+    console.log(`Received request from ip: ${req.ip}`);
+
+    //
+    const userId = req.params.userId;
+
+    console.log("User ID: " + userId);
+
+    //
+    const options = { args: [userId] };
+    if (req.body.parameters) {
+        const params = JSON.parse(req.body.parameters);
+
+        for (let key in params) {
+            options.args.push(`--${key}`);
+            options.args.push(params[key]);
+        }
+    }
+    // console.log("Options", options)
+
+    let doCleanup = async () => {
+        return new Promise((resolve, reject) => {
+            let userIdPath = path.join(dir, 'tmpImages', userId);
+
+            fs.rm(userIdPath, { recursive: true }, (err) => {
+                if (err) {
+                    console.error(err);
+                    reject(err);
+                }
+                resolve();
+            });
+        })
+    }
+
+    const mainPath = path.join(dir, 'reconstruction','main.py');    
+    let pyshell = new PythonShell(mainPath, options);
+
+    pyshell.on('message', function (message) {
+        // received a message sent from the Python script (a simple "print" statement)
+        console.log(message);
+        if (message.includes(resultCheck))
+            outputImagePath = message.split(resultCheck)[1];
+    });
+
+    // end the input stream and allow the process to exit
+    pyshell.end(async function (err, code, signal) {
+        if (err) {
+            await doCleanup();
+            throw err;
+        }
+
+        console.log("Server accessing result...")
+        console.log("Output image path: " + outputImagePath)
+        let ext = path.extname(outputImagePath);
+        let contentType;
+
+        switch (ext) {
+            case '.png':
+                contentType = 'image/png';
+                break;
+            default:
+                contentType = 'application/octet-stream';
+        }
+
+        // Read the output image file and send it as a response
+        fs.readFile(outputImagePath, async (err, data) => {
+            if (err) {
+                await doCleanup();
+                throw err;
+            }
+            console.log("Success! Sending response...")
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(data);
+
+            await doCleanup();
+        });
+    });
+});
+
 app.get('/', (req, res) => {
     res.json({
         hello: 'hi!'

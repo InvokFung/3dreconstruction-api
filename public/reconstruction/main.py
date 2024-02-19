@@ -15,7 +15,9 @@ def process_image(input_folder, output_folder):
     print("Done processing images and depth maps.")
 
     #
+    print("Saving preprocessing plot...")
     savePlot(images, depthMaps, output_folder)
+    print("Done saving preprocessing plot.")
 
     #
     print("Generating PCD fragments...")
@@ -24,14 +26,10 @@ def process_image(input_folder, output_folder):
 
     #
     print("Registering PCD fragments...")
-    pcd = register_fragments(fragments, output_folder)
-    print("Done registering PCD fragments.")
+    pcd_save_path = register_fragments(fragments, output_folder)
+    print("Done registering PCD fragments.")        
 
-    output_image_path = f"{output_folder}/output.png"
-
-    # img.save(output_image_path)
-
-    # print(f"Result path: {output_image_path}")  # Print the path of the output imag
+    # print(f"Result path: {pcd_save_path}")  # Print the path of the output imag
 
     # Get the parent directory of the current file
     parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -72,19 +70,21 @@ if __name__ == "__main__":
     )
 
     # Get user input images folder path
-    parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    input_folder = os.path.join(parent_dir_path, "tmpImages", userId)
+    parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))    
+    print(f"Parent folder:{parent_dir_path}")
+    input_folder = os.path.join(parent_dir_path, "tmpImages", userId)    
+    print(f"Input folder:{input_folder}")
 
     create_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    # Ensure the user output folder ready
+    # Ensure the user output folder ready    
     output_dir = os.path.join(parent_dir_path, "output", userId)
-    os.makedirs(output_dir, exist_ok=True)
-    output_dir = os.path.join(output_dir, create_time)
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)    
+    output_folder = os.path.join(output_dir, create_time)
+    os.makedirs(output_folder, exist_ok=True)
+    print(f"Output folder:{output_folder}")
 
-    output_folder = f"output/{userId}/{create_time}"
-    log_file_name = f"{output_folder}/history.log"
+    log_file_name = os.path.join(output_folder, "history.log")    
     logging.basicConfig(filename=log_file_name, level=logging.INFO)
     logging.info(f"Starting the program for user {userId}...")
     process_image(input_folder, output_folder)
