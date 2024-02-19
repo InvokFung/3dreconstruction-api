@@ -1,7 +1,10 @@
 {
-  "main": "server.js",
+  "name": "3dreconstruction-api",
+  "version": "1.0.0",
+  "description": "3D Reconstruction API",  
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
