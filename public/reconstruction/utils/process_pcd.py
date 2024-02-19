@@ -92,7 +92,7 @@ def generate_single_fragment(image, depthMap):
     # eps = 1.5  # 同一Cluster中點與點之間允許的最大距離
     # min_points = 50  # 每個Cluster至少有min_points個點才成立
     # eps = 0.004
-    eps = 0.005
+    eps = 0.0045
     min_points = 500
 
     with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
@@ -140,8 +140,8 @@ def register_fragments(fragments, output_folder):
     pcds = []
 
     #
-    # voxel_size = 0.0005
-    voxel_size = 0.001
+    voxel_size = 0.0005
+    # voxel_size = 0.005
     #
     origin_pcds = fragments
 

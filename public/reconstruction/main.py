@@ -88,3 +88,4 @@ if __name__ == "__main__":
     logging.basicConfig(filename=log_file_name, level=logging.INFO)
     logging.info(f"Starting the program for user {userId}...")
     process_image(input_folder, output_folder)
+    logging.info(f"Program finished for user {userId}...")
