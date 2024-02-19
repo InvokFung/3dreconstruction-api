@@ -12,18 +12,21 @@ app.use(cors());
 
 app.use("/", express.static('public'));
 
+// Base directory
+const dir = path.join(__dirname, 'public');
+
 // Make sure tmpImages/ folder exist
-const dir = path.join(__dirname, 'tmpImages');
-if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+const tmpImgsDir = path.join(dir, 'tmpImages');
+if (!fs.existsSync(tmpImgsDir)) {
+    fs.mkdirSync(tmpImgsDir, { recursive: true });
 }
 
 // Request storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const dir = path.join(__dirname, 'tmpImages', req.params.userId, "rgb");
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
+        const userDir = path.join(dir, 'tmpImages', req.params.userId, "rgb");
+        fs.mkdirSync(userDir, { recursive: true });
+        cb(null, userDir);
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
