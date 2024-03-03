@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -5,6 +6,7 @@ const { PythonShell } = require('python-shell');
 const path = require('path');
 const fs = require('fs');
 const ejs = require('ejs');
+const { s3Uploadv3, s3Download } = require("./s3service");
 
 const app = express();
 
@@ -24,35 +26,35 @@ if (!fs.existsSync(tmpImgsDir)) {
 }
 
 // Request storage
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const userDir = path.join(dir, 'tmpImages', req.params.userId, "rgb");
-        fs.mkdirSync(userDir, { recursive: true });
-        cb(null, userDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// const storage = multer.diskStorage({
+//     destination: function (req, file, cb) {
+//         const userDir = path.join(dir, 'tmpImages', req.params.userId, "rgb");
+//         fs.mkdirSync(userDir, { recursive: true });
+//         cb(null, userDir);
+//     },
+//     filename: function (req, file, cb) {
+//         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+//         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+//     }
+// });
+
+const storage = multer.memoryStorage();
 
 const upload = multer({ storage: storage });
 
-const resultCheck = "Result path: ";
-
-app.post('/process_image/:userId', upload.array('images'), (req, res) => {
-
-    let outputImagePath = "";
+app.post('/process_image/:userId/:projectId', upload.array('images'), async (req, res) => {
 
     console.log(`Received request from ip: ${req.ip}`);
 
     //
     const userId = req.params.userId;
+    const projectId = req.params.projectId;
 
     console.log("User ID: " + userId);
+    console.log("Project ID: " + projectId);
 
     //
-    const options = { args: [userId] };
+    const options = { args: [userId, projectId] };
     if (req.body.parameters) {
         const params = JSON.parse(req.body.parameters);
 
@@ -63,62 +65,40 @@ app.post('/process_image/:userId', upload.array('images'), (req, res) => {
     }
     // console.log("Options", options)
 
-    let doCleanup = async () => {
-        return new Promise((resolve, reject) => {
-            let userIdPath = path.join(dir, 'tmpImages', userId);
-
-            fs.rm(userIdPath, { recursive: true }, (err) => {
-                if (err) {
-                    console.error(err);
-                    reject(err);
-                }
-                resolve();
-            });
-        })
+    try {
+        await s3Uploadv3(req);
+    } catch (err) {
+        console.error(err);
+        return;
     }
+    console.log("File successfully uploaded to S3")
 
-    const mainPath = path.join(dir, 'reconstruction','main.py');    
+    // Call the python script
+    const mainPath = path.join(dir, 'reconstruction', 'main.py');
     let pyshell = new PythonShell(mainPath, options);
 
     pyshell.on('message', function (message) {
         // received a message sent from the Python script (a simple "print" statement)
         console.log(message);
-        if (message.includes(resultCheck))
-            outputImagePath = message.split(resultCheck)[1];
     });
 
     // end the input stream and allow the process to exit
     pyshell.end(async function (err, code, signal) {
         if (err) {
-            await doCleanup();
             throw err;
         }
 
         console.log("Server accessing result...")
-        console.log("Output image path: " + outputImagePath)
-        let ext = path.extname(outputImagePath);
-        let contentType;
-
-        switch (ext) {
-            case '.png':
-                contentType = 'image/png';
-                break;
-            default:
-                contentType = 'application/octet-stream';
+        try {
+            const npyBody = (await s3Download(req)).Body;
+            // Set response headers
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('Content-Disposition', 'attachment; filename="accumulated_numpy.npy"');
+            // Send the file data as a binary stream
+            res.send(npyBody);
+        } catch (err) {
+            console.error(err);
         }
-
-        // Read the output image file and send it as a response
-        fs.readFile(outputImagePath, async (err, data) => {
-            if (err) {
-                await doCleanup();
-                throw err;
-            }
-            console.log("Success! Sending response...")
-            res.writeHead(200, { 'Content-Type': contentType });
-            res.end(data);
-
-            await doCleanup();
-        });
     });
 });
 

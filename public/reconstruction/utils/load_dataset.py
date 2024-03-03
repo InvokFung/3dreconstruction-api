@@ -1,3 +1,4 @@
+import io
 import os
 import math
 from PIL import Image
@@ -6,7 +7,10 @@ from utils.depth_midas import renderDepthMap
 import cv2
 
 
-def savePlot(images, depthMaps, output_folder):
+def savePlot(inputs, folder_paths):
+    s3 = inputs["s3"]
+    images = inputs["images"]
+    depthMaps = inputs["depthMaps"]
     # Calculate the number of rows and columns for the grid
     num_images = len(images) + len(depthMaps)
     grid_size = math.ceil(math.sqrt(num_images))
@@ -24,9 +28,15 @@ def savePlot(images, depthMaps, output_folder):
         ax.imshow(depthMap, cmap="gray")
         ax.axis("off")  # Hide axes
 
-    plotSavePath = os.path.join(output_folder, "preprocess.png")    
-    print(plotSavePath)
-    plt.savefig(plotSavePath)
+    # Save the plot to an in-memory bytes stream
+    plot_stream = io.BytesIO()
+    plt.savefig(plot_stream, format='png')
+    plot_stream.seek(0)  # Rewind the stream
+    
+    bucketName = inputs["bucketName"]
+    output_folder = folder_paths["output"]    
+    plot_object_name = f"{output_folder}/preprocess.png"
+    s3.upload_fileobj(plot_stream, bucketName, plot_object_name)
 
 
 #
@@ -46,39 +56,12 @@ def load_rgb_images(input_folder):
 
 
 #
-def load_depthMaps(input_folder, images, images_names):
+def generate_depthmaps(inputs):
+    images = inputs["images"]
+
     depthMaps = []
-    depth_folder = os.path.join(input_folder, "depth")
-
-    if not os.path.exists(depth_folder):
-        print("Detected first time running, rendering depth maps...")
-
-        os.makedirs(depth_folder, exist_ok=True)
-
-        for i in range(len(images)):
-            depthMap = renderDepthMap(images[i])
-            saveName = os.path.join(depth_folder, images_names[i])
-            plt.imsave(saveName, depthMap)
-            depthMaps.append(depthMap)
-    else:
-        print("Detected folder existing, loading depth maps...")
-
-        for filename in sorted(os.listdir(depth_folder)):
-            image_path = os.path.join(depth_folder, filename)
-            depthMap = cv2.imread(image_path)
-            depthMaps.append(depthMap)
+    for i in range(len(images)):
+        depthMap = renderDepthMap(images[i])
+        depthMaps.append(depthMap)
 
     return depthMaps
-
-
-# ==================== Load dataset ====================
-def preprocess_images(input_folder):
-    images, images_names = load_rgb_images(input_folder)
-
-    print(f"Done loading total {len(images)} images.")
-
-    depthMaps = load_depthMaps(input_folder, images, images_names)
-
-    print("Done loading all depth maps.")
-
-    return images, images_names, depthMaps

@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import os
+import io
 import math
 from utils.posegraph_ICP import full_registration
 
@@ -16,11 +17,10 @@ cx = 320
 cy = 240
 
 
-def generate_fragments(images, depthMaps, input_folder, options=None):
+def generate_fragments(inputs, folder_paths):
+    images = inputs["images"]
+    depthMaps = inputs["depthMaps"]
     fragments = []
-
-    # pcd_folder = os.path.join(input_folder, "pcd")
-    # os.makedirs(pcd_folder, exist_ok=True)
 
     for i in range(len(images)):
         fragment = generate_single_fragment(images[i], depthMaps[i])
@@ -136,7 +136,7 @@ def generate_single_fragment(image, depthMap):
     return interest_pcd
 
 
-def register_fragments(fragments, output_folder):
+def register_fragments(inputs, folder_paths, fragments):
     pcds = []
 
     #
@@ -179,11 +179,36 @@ def register_fragments(fragments, output_folder):
     # print("Transforming pcd and visualizing...")
     accumulated_pcd = o3d.geometry.PointCloud()
     for point_id in range(len(origin_pcds)):
-        accumulated_pcd += origin_pcds[point_id].transform(
-            pose_graph.nodes[point_id].pose
-        )
-    o3d.visualization.draw_geometries([accumulated_pcd])
-    pcd_save_path = os.path.join(output_folder, "output.pcd")
-    o3d.io.write_point_cloud(pcd_save_path, accumulated_pcd)
+        # accumulated_pcd += origin_pcds[point_id].transform(
+        #     pose_graph.nodes[point_id].pose
+        # )
+        transformed_pcd = origin_pcds[point_id].transform(pose_graph.nodes[point_id].pose)
+        accumulated_pcd.points.extend(transformed_pcd.points)
+        accumulated_pcd.colors.extend(transformed_pcd.colors)
+    # o3d.visualization.draw_geometries([accumulated_pcd])
 
-    return pcd_save_path
+    print("Saving pointclouds to numpy array...")
+    # Convert Open3D point cloud to NumPy arrays for points and colors
+    
+    points = np.asarray(accumulated_pcd.points)
+    colors = np.asarray(accumulated_pcd.colors)
+
+    # Combine points and colors into a single NumPy array
+    # Assuming both points and colors have the same number of elements
+    point_cloud_data = np.hstack((points, colors))
+
+    # pcd_bytes = pcd_array.tobytes()
+    # # Create an in-memory bytes stream
+    # pcd_stream = io.BytesIO(pcd_bytes)
+
+    # Create a BytesIO object to store the NumPy array
+    bytes_buffer = io.BytesIO()
+    np.save(bytes_buffer, point_cloud_data)
+    bytes_buffer.seek(0)  # Reset buffer position to the beginning
+
+    
+    s3 = inputs["s3"]
+    bucketName = inputs["bucketName"]
+    output_folder = folder_paths["output"]
+    pcd_output_path = f"{output_folder}/accumulated_numpy.npy"
+    s3.upload_fileobj(bytes_buffer, bucketName, pcd_output_path)
