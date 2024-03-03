@@ -11,9 +11,7 @@ exports.s3Uploadv2 = async (req) => {
     });
 
     const userId = req.params.userId;
-    // const projectId = req.body.projectId;
     const projectId = 1;
-    // console.log(req.files)
 
     const params = req.files.map(file => {
         const userRgbPath = `user-${userId}/${projectId}/rgb/${file.originalname}`;

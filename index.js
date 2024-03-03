@@ -6,7 +6,7 @@ const { PythonShell } = require('python-shell');
 const path = require('path');
 const fs = require('fs');
 const ejs = require('ejs');
-const { s3Uploadv3, s3Download } = require("./s3service");
+const { s3Uploadv2, s3Download } = require("./s3service");
 
 const app = express();
 
@@ -67,7 +67,7 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
 
     console.log("Uploading files to S3...")
     try {
-        await s3Uploadv3(req);
+        await s3Uploadv2(req);
     } catch (err) {
         console.error(err);
         return;
