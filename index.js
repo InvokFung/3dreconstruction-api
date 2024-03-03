@@ -6,7 +6,7 @@ const { PythonShell } = require('python-shell');
 const path = require('path');
 const fs = require('fs');
 const ejs = require('ejs');
-const { s3Uploadv2, s3Download } = require("./s3service");
+const { s3Uploadv3, s3Download } = require("./s3service");
 
 const app = express();
 
@@ -67,13 +67,14 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
 
     console.log("Uploading files to S3...")
     try {
-        await s3Uploadv2(req);
+        await s3Uploadv3(req);
     } catch (err) {
         console.error(err);
         return;
     }
     console.log("File successfully uploaded to S3")
 
+    console.log("Processing in server python script...")
     // Call the python script
     const mainPath = path.join(dir, 'reconstruction', 'main.py');
     let pyshell = new PythonShell(mainPath, options);
@@ -89,6 +90,7 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
             throw err;
         }
 
+        console.log("Reconstruction process finished.")
         console.log("Server accessing result...")
         try {
             const npyBody = (await s3Download(req)).Body;
@@ -97,6 +99,7 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
             res.setHeader('Content-Disposition', 'attachment; filename="accumulated_numpy.npy"');
             // Send the file data as a binary stream
             res.send(npyBody);
+            console.log("Result sent to client.")
         } catch (err) {
             console.error(err);
         }

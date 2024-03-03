@@ -1,4 +1,4 @@
-const { S3, Endpoint } = require("aws-sdk");
+const { S3 } = require("aws-sdk");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { Readable } = require('stream');
 
@@ -7,7 +7,7 @@ exports.s3Uploadv2 = async (req) => {
         region: process.env.AWS_REGION,
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        endpoint: process.env.AWS_ENDPOINT
+        // endpoint: process.env.AWS_ENDPOINT
     });
 
     const userId = req.params.userId;
@@ -50,12 +50,7 @@ exports.s3Uploadv3 = async (req) => {
 }
 
 exports.s3Download = async (req) => {
-    const s3 = new S3({
-        region: process.env.AWS_REGION,
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        endpoint: process.env.AWS_ENDPOINT
-    });
+    const s3 = new S3();
 
     const userId = req.params.userId;
     const projectId = 1;
@@ -66,6 +61,7 @@ exports.s3Download = async (req) => {
         Bucket: process.env.AWS_BUCKET_NAME,
         Key: userResultPath,
     }
+    
     return await s3.getObject(params).promise();
 }
 
@@ -74,7 +70,7 @@ exports.s3Downloadv3 = async (req) => {
         region: process.env.AWS_REGION,
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        endpoint: process.env.AWS_ENDPOINT
+        // endpoint: process.env.AWS_ENDPOINT
     });
     
     const userId = req.params.userId;

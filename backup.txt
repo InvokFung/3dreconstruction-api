@@ -1,0 +1,5 @@
+# AWS_ACCESS_KEY_ID = AKIASCFQTIDDYCA3LUSR
+# AWS_SECRET_ACCESS_KEY = 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
+# AWS_FULL_ENDPOINT = https://fypreconstruction.s3-ap-southeast-2.amazonaws.com
+# AWS_FULL_ENDPOINT = https://s3.ap-southeast-2.amazonaws.com
+# AWS_ENDPOINT = s3.ap-southeast-2.amazonaws.com

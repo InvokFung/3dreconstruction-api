@@ -96,8 +96,7 @@ if __name__ == "__main__":
         "s3",
         region_name=os.getenv("AWS_REGION"),
         aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        endpoint_url=os.getenv("AWS_FULL_ENDPOINT")
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
     )
 
     images, images_names = read_images_from_s3_folder(bucketName, input_folder)
