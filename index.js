@@ -65,6 +65,7 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
     }
     // console.log("Options", options)
 
+    console.log("Uploading files to S3...")
     try {
         await s3Uploadv3(req);
     } catch (err) {
@@ -104,13 +105,13 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
 
 app.get('/', (req, res) => {
     res.json({
-        hello: 'hi!'
+        hello: 'hi3!'
     });
 })
 
 app.get('/test', (req, res) => {
     res.json({
-        hello: 'hi2!'
+        hello: 'hi4!'
     });
 })
 
