@@ -3,7 +3,11 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/clien
 const { Readable } = require('stream');
 
 exports.s3Uploadv2 = async (req) => {
-    const s3 = new S3();
+    const s3 = new S3({
+        region: process.env.AWS_REGION,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    });
 
     const userId = req.params.userId;
     // const projectId = req.body.projectId;
@@ -25,7 +29,11 @@ exports.s3Uploadv2 = async (req) => {
 }
 
 exports.s3Uploadv3 = async (req) => {
-    const s3client = new S3Client();
+    const s3client = new S3Client({
+        region: process.env.AWS_REGION,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    });
 
     const userId = req.params.userId;
     const projectId = 1;
@@ -43,7 +51,11 @@ exports.s3Uploadv3 = async (req) => {
 }
 
 exports.s3Download = async (req) => {
-    const s3 = new S3();
+    const s3 = new S3({
+        region: process.env.AWS_REGION,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    });
 
     const userId = req.params.userId;
     const projectId = 1;
@@ -58,7 +70,11 @@ exports.s3Download = async (req) => {
 }
 
 exports.s3Downloadv3 = async (req) => {
-    const s3client = new S3Client();
+    const s3client = new S3Client({
+        region: process.env.AWS_REGION,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    });
     
     const userId = req.params.userId;
     const projectId = 1;
