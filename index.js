@@ -46,16 +46,6 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
 
     console.log(`Received request from ip: ${req.ip}`);
 
-    res.setHeader('Access-Control-Allow-Credentials', true)
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    // another common pattern
-    // res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    )
-
     //
     const userId = req.params.userId;
     const projectId = req.params.projectId;
@@ -121,16 +111,6 @@ app.get("/tests3/:userId/:projectId", async (req, res) => {
     try {
         console.log("Testing s3 download...")
 
-        res.setHeader('Access-Control-Allow-Credentials', true)
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        // another common pattern
-        // res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
-        res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-        res.setHeader(
-            'Access-Control-Allow-Headers',
-            'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-        )
-
         const userId = req.params.userId;
         const projectId = req.params.projectId;
 
@@ -179,3 +159,27 @@ app.get('/test', (req, res) => {
 // }
 
 app.listen(3000, () => console.log('Server started on port 3000'));
+
+const allowCors = fn => async (req, res) => {
+    res.setHeader('Access-Control-Allow-Credentials', true)
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    // another common pattern
+    // res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    )
+    if (req.method === 'OPTIONS') {
+      res.status(200).end()
+      return
+    }
+    return await fn(req, res)
+  }
+  
+  const handler = (req, res) => {
+    const d = new Date()
+    res.end(d.toString())
+  }
+  
+  module.exports = allowCors(handler)
