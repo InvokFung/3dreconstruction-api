@@ -109,6 +109,20 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
 app.get("/tests3/:userId/:projectId", async (req, res) => {
     try {
         console.log("Testing s3 download...")
+
+        const userId = req.params.userId;
+        const projectId = req.params.projectId;
+
+        console.log("User ID: " + userId);
+        console.log("Project ID: " + projectId);
+
+        const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+        const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+        const region = process.env.AWS_REGION;
+        console.log("Access Key ID: " + accessKeyId);
+        console.log("Secret Access Key: " + secretAccessKey);
+        console.log("Region: " + region);
+
         const data = await s3Download(req);
         res.send(data.Body);
         console.log("Test s3 download success.")
