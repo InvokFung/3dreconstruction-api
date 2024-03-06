@@ -106,6 +106,17 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
     });
 });
 
+app.get("/tests3", async (req, res) => {
+    try {
+        console.log("Testing s3 download...")
+        const data = await s3Download(req);
+        res.send(data.Body);
+        console.log("Test s3 download success.")
+    } catch (err) {
+        console.error(err);
+    }
+});
+
 app.get('/', (req, res) => {
     res.json({
         hello: 'hi3!'
