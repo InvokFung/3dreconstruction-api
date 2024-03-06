@@ -106,7 +106,7 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
     });
 });
 
-app.get("/tests3", async (req, res) => {
+app.get("/tests3/:userId/:projectId", async (req, res) => {
     try {
         console.log("Testing s3 download...")
         const data = await s3Download(req);
