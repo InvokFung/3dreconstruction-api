@@ -45,6 +45,16 @@ const upload = multer({ storage: storage });
 
 app.post('/process_image/:userId/:projectId', upload.array('images'), async (req, res) => {
 
+    res.setHeader('Access-Control-Allow-Credentials', true)
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    // another common pattern
+    // res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    )
+
     console.log(`Received request from ip: ${req.ip}`);
 
     //
@@ -128,7 +138,8 @@ app.get("/tests3/:userId/:projectId", async (req, res) => {
         console.log("Region: " + region);
 
         const data = await s3Download(req);
-        res.send(data.Body);
+        // res.send(data.Body);
+        res.send("Success")
         console.log("Test s3 download success.")
     } catch (err) {
         console.error(err);
