@@ -25,6 +25,7 @@ if (!fs.existsSync(tmpImgsDir)) {
     fs.mkdirSync(tmpImgsDir, { recursive: true });
 }
 
+
 // Request storage
 // const storage = multer.diskStorage({
 //     destination: function (req, file, cb) {
