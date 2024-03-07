@@ -1,4 +1,4 @@
-// require("dotenv").config();
+require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -91,7 +91,9 @@ app.post('/process_image/:userId/:projectId', upload.array('images'), async (req
         }
 
         console.log("Reconstruction process finished.")
-        res.send("Success");
+        res.send({
+            code: 200
+        });
         // console.log("Server accessing result...")
         // try {
         //     const npyBody = (await s3Download(req)).Body;

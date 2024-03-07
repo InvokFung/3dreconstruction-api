@@ -71,10 +71,10 @@ def read_images_from_s3_folder(bucketName, folder):
 
 if __name__ == "__main__":
 
-    userId = sys.argv[1]
-    projectId = sys.argv[2]
-    # userId = 1
-    # projectId = 1
+    # userId = sys.argv[1]
+    # projectId = sys.argv[2]
+    userId = 1
+    projectId = 1
 
     # Default parameters
     params = {
