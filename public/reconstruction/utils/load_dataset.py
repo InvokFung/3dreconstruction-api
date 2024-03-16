@@ -1,7 +1,6 @@
 import io
 import os
 import math
-from PIL import Image
 from matplotlib import pyplot as plt
 from utils.depth_midas import renderDepthMap
 import cv2
