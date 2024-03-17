@@ -1,11 +1,6 @@
-try:
-    import unzip_torch
-except ImportError:
-    pass
-print("Halo")
-import torch
 import numpy as np
 import cv2
+import torch
 
 model = None
 device = None

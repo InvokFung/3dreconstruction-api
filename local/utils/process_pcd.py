@@ -1,12 +1,11 @@
 import open3d as o3d
 import numpy as np
 import cv2
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import os
 import io
 import math
 from utils.posegraph_ICP import full_registration
-import colorsys
 
 import open3d as o3d
 
@@ -29,14 +28,6 @@ def generate_fragments(inputs, folder_paths):
 
     return fragments
 
-def get_color(n, max_n):
-    if max_n == 0:
-        max_n = 1
-    hue = n / max_n
-    lightness = 0.5
-    saturation = 0.8
-    r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
-    return r, g, b
 
 def generate_single_fragment(image, depthMap):
     img = image
@@ -113,8 +104,7 @@ def generate_single_fragment(image, depthMap):
     # Extract Clustered point clouds
     cluster_pcd = o3d.geometry.PointCloud()
     cluster_pcd.points = o3d.utility.Vector3dVector(down_pcd.points)
-    # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-    colors = np.array([get_color(label, max_label if max_label > 0 else 1) for label in labels])
+    colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
     colors[labels < 0] = 0  # labels = -1 : noise cluster, display in color black
     cluster_pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
     # print("Displaying clustered point cloud")

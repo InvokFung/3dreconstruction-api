@@ -1,17 +1,18 @@
+from dotenv import load_dotenv
 import io
 import os
 import sys
 import logging
+from PIL import Image
+import matplotlib.pyplot as plt
+from datetime import datetime
+from utils.load_dataset import generate_depthmaps, savePlot
+from utils.process_pcd import generate_fragments, register_fragments
 import boto3
 import numpy as np
 import cv2
-import json
-# from dotenv import load_dotenv
-# from utils.load_dataset import generate_depthmaps, savePlot
-from utils.load_dataset import generate_depthmaps
-from utils.process_pcd import generate_fragments, register_fragments
 
-# load_dotenv()
+load_dotenv()
 
 
 def process_image(inputs, folder_paths):
@@ -20,21 +21,24 @@ def process_image(inputs, folder_paths):
     depthMaps = generate_depthmaps(inputs)
     inputs["depthMaps"] = depthMaps
     logging.info("Done processing images and depth maps.")
+    print(f"main_progress:40")
 
     #
-    # logging.info("Saving preprocessing plot...")
-    # savePlot(inputs, folder_paths)
-    # logging.info("Done saving preprocessing plot.")
+    logging.info("Saving preprocessing plot...")
+    savePlot(inputs, folder_paths)
+    logging.info("Done saving preprocessing plot.")
+    print(f"main_progress:45")
 
     #
     logging.info("Generating PCD fragments...")
     fragments = generate_fragments(inputs, folder_paths)
     logging.info("Done generating PCD fragments.")
+    print(f"main_progress:70")
 
     #
     logging.info("Registering PCD fragments...")
     register_fragments(inputs, folder_paths, fragments)
-    logging.info("Done registering PCD fragments.")
+    logging.info("Done registering PCD fragments.")    
 
 
 def read_images_from_s3_folder(bucketName, folder):
@@ -57,6 +61,8 @@ def read_images_from_s3_folder(bucketName, folder):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
             # image_display = Image.open(io.BytesIO(image_content))
+            # plt.imshow(image_display)
+            # plt.show()
 
             images.append(image)
             images_names.append(obj["Key"])
@@ -66,13 +72,10 @@ def read_images_from_s3_folder(bucketName, folder):
     return images, images_names
 
 
-def lambda_handler(event, context):
-    userId = event['userId']
-    projectId = event['projectId']
-    # if __name__ == "__main__":
+if __name__ == "__main__":
 
-    #     userId = sys.argv[1]
-    #     projectId = sys.argv[2]
+    userId = sys.argv[1]
+    projectId = sys.argv[2]
     # userId = 1
     # projectId = 1
 
@@ -86,8 +89,7 @@ def lambda_handler(event, context):
         "cy": 247,
     }
 
-    # bucketName = os.getenv("AWS_BUCKET_NAME")
-    bucketName = "fypfastreconstruction"
+    bucketName = os.getenv("AWS_BUCKET_NAME")
 
     project_folder = f"user-{userId}/{projectId}"
     input_folder = f"{project_folder}/rgb"
@@ -95,15 +97,14 @@ def lambda_handler(event, context):
 
     s3 = boto3.client(
         "s3",
-        region_name="ap-southeast-2",
-        aws_access_key_id="AKIASCFQTIDD3TDXU3XO",
-        aws_secret_access_key="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"
-        # region_name=os.getenv("AWS_REGION"),
-        # aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        # aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
+        region_name=os.getenv("AWS_REGION"),
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
     )
 
     images, images_names = read_images_from_s3_folder(bucketName, input_folder)
+
+    print(f"main_progress:30")
 
     # Read command line arguments
     for i in range(3, len(sys.argv), 2):
@@ -136,7 +137,9 @@ def lambda_handler(event, context):
         "output": output_folder,
     }
 
+    print(f"main_progress:35")
     process_image(inputs, folder_paths)
+    print(f"main_progress:90")
 
     logging.info(f"Program finished for user {userId}...")
     # Get the log contents
@@ -146,10 +149,4 @@ def lambda_handler(event, context):
     # Create an in-memory bytes stream
     log_bytes_stream = io.BytesIO(log_bytes)
     s3.upload_fileobj(log_bytes_stream, bucketName, log_output_path)
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'code': 200
-        })
-    }
+    print(f"main_progress:95")

@@ -6,6 +6,7 @@ const { PythonShell } = require('python-shell');
 const path = require('path');
 const fs = require('fs');
 const ejs = require('ejs');
+const EventEmitter = require('events');
 const { s3Uploadv3, s3Download } = require("./s3service");
 const bcrypt = require('bcrypt');
 const connectDb = require("./config");
@@ -23,13 +24,14 @@ const startServer = async () => {
     app.use("/", express.static('public'));
 
     // Base directory
-    const dir = path.join(__dirname, 'public');
+    // const dir = path.join(__dirname, 'public');
+    const localDir = path.join(__dirname, 'local');
 
     // Make sure tmpImages/ folder exist
-    const tmpImgsDir = path.join(dir, 'tmpImages');
-    if (!fs.existsSync(tmpImgsDir)) {
-        fs.mkdirSync(tmpImgsDir, { recursive: true });
-    }
+    // const tmpImgsDir = path.join(dir, 'tmpImages');
+    // if (!fs.existsSync(tmpImgsDir)) {
+    //     fs.mkdirSync(tmpImgsDir, { recursive: true });
+    // }
 
 
     // Request storage
@@ -49,6 +51,13 @@ const startServer = async () => {
 
     const upload = multer({ storage: storage });
 
+    const users = {};
+
+    const updateProgress = (userId, projectId, progress) => {
+        users[userId][projectId].progress = progress;
+        users[userId][projectId].eventEmitter.emit('progress', { value: progress });
+    }
+
     app.post('/process_image/:userId/:projectId', upload.array('images'), async (req, res) => {
 
         console.log(`Received request from ip: ${req.ip}`);
@@ -59,6 +68,9 @@ const startServer = async () => {
 
         console.log("User ID: " + userId);
         console.log("Project ID: " + projectId);
+
+        // Start the progress at 0    
+        updateProgress(userId, projectId, 0);
 
         //
         const options = { args: [userId, projectId] };
@@ -72,6 +84,7 @@ const startServer = async () => {
         }
         // console.log("Options", options)
 
+        updateProgress(userId, projectId, 10);
         console.log("Uploading files to S3...")
         try {
             await s3Uploadv3(req);
@@ -80,15 +93,21 @@ const startServer = async () => {
             return;
         }
         console.log("File successfully uploaded to S3")
+        updateProgress(userId, projectId, 20);
 
         console.log("Processing in server python script...")
         // Call the python script
-        const mainPath = path.join(dir, 'reconstruction', 'main.py');
+        const mainPath = path.join(localDir, 'main.py');
         let pyshell = new PythonShell(mainPath, options);
 
         pyshell.on('message', function (message) {
             // received a message sent from the Python script (a simple "print" statement)
             console.log(message);
+            // Progress range 30-90
+            if (message.includes("main_progress")) {
+                const progress = parseInt(message.split(":")[1]);
+                updateProgress(userId, projectId, progress);
+            }
         });
 
         // end the input stream and allow the process to exit
@@ -98,6 +117,7 @@ const startServer = async () => {
             }
 
             console.log("Reconstruction process finished.")
+            updateProgress(userId, projectId, 100);
             res.send({
                 code: 200
             });
@@ -114,6 +134,45 @@ const startServer = async () => {
             //     console.error(err);
             // }
         });
+    });
+
+    function sendProgressUpdates(req, res) {
+        const userId = req.params.userId;
+        const projectId = req.params.projectId;
+
+        users[userId] = {};
+        users[userId][projectId] = {
+            eventEmitter: new EventEmitter(),
+            progress: 0
+        };
+
+        const projectData = users[userId][projectId];
+        console.log("Progress update binded received.")
+        console.log("From user: " + userId)
+
+        // This is just an example. Your actual progress updates would come from somewhere else.
+        projectData.eventEmitter.on('progress', (progress) => {
+            // Send the progress update to the client
+            res.write(`data: ${progress.value}\n\n`);
+
+            if (progress.value >= 100) {
+                res.write('data: CLOSE\n\n');
+                res.end();
+            }
+        })
+    }
+
+    app.get('/process_image/:userId/:projectId', (req, res) => {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
+
+        // Send an initial message to indicate that the server is ready
+        res.write('data: READY\n\n');
+
+        // Send progress updates
+        sendProgressUpdates(req, res);
     });
 
     app.get("/tests3/:userId/:projectId", async (req, res) => {
