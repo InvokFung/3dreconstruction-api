@@ -59,7 +59,7 @@ const connectDb = async () => {
 
         return { usersModel, projectsModel }
     } catch (err) {
-        console.log("Database connection failed: " + err)
+        throw "Database connection failed: " + err
     }
 }
 
