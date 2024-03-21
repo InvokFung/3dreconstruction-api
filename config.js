@@ -8,6 +8,10 @@ const connectDb = async () => {
         console.log("=====================================")
 
         const userSchema = new mongoose.Schema({
+            userId: {
+                type: String,
+                required: true
+            },
             username: {
                 type: String,
                 required: true
@@ -36,13 +40,17 @@ const connectDb = async () => {
             projectName: {
                 type: String,
                 required: true
-            },            
+            },
             // projectLocation: {
             //     type: String,
             //     required: true
             // },
             projectStatus: {
                 type: String,
+                required: true
+            },
+            projectProgress: {
+                type: Number,
                 required: true
             },
             projectDate: {

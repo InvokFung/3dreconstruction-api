@@ -4,11 +4,12 @@ const cors = require('cors');
 const multer = require('multer');
 const { PythonShell } = require('python-shell');
 const path = require('path');
-const fs = require('fs');
-const ejs = require('ejs');
+// const fs = require('fs');
+// const ejs = require('ejs');
 const EventEmitter = require('events');
 const { s3Uploadv3, s3Download } = require("./s3service");
 const bcrypt = require('bcrypt');
+const uuid = require("uuid")
 const connectDb = require("./config");
 
 const startServer = async () => {
@@ -54,7 +55,12 @@ const startServer = async () => {
     const users = {};
 
     const updateProgress = (userId, projectId, progress) => {
-        users[userId][projectId].progress = progress;
+        users[userId][projectId].liveProgress = progress;
+        // Update the progress in the database
+        const filter = { projectOwner: userId, projectId };
+        const update = { projectProgress: progress };
+        projectsModel.findOneAndUpdate(filter, update);
+
         users[userId][projectId].eventEmitter.emit('progress', { value: progress });
     }
 
@@ -82,7 +88,7 @@ const startServer = async () => {
                 options.args.push(params[key]);
             }
         }
-        // console.log("Options", options)
+        console.log("Options", options)
 
         updateProgress(userId, projectId, 10);
         console.log("Uploading files to S3...")
@@ -143,7 +149,7 @@ const startServer = async () => {
         users[userId] = {};
         users[userId][projectId] = {
             eventEmitter: new EventEmitter(),
-            progress: 0
+            liveProgress: 0
         };
 
         const projectData = users[userId][projectId];
@@ -231,6 +237,8 @@ const startServer = async () => {
 
             data.password = hashedPassword;
 
+            const userId = data.userId = uuid.v4();
+            const username = data.username;
             // update authToken
             const authToken = data.authToken = Math.random().toString(36).substring(7);
             // Expire after 1 month
@@ -242,8 +250,10 @@ const startServer = async () => {
             res.send({
                 status: 200,
                 content: "User registered successfully",
-                authToken: authToken,
-                expiryDate: expiryDate
+                userId,
+                username,
+                authToken,
+                expiryDate
             })
         }
     })
@@ -265,14 +275,17 @@ const startServer = async () => {
                 const expiryDate = new Date() + 30 * 24 * 60 * 60 * 1000;
                 const filter = { username: data.username };
                 const update = { authToken, expiryDate };
-                await usersModel.findOneAndUpdate(filter, update);
+                const userData = await usersModel.findOneAndUpdate(filter, update);
+                const { userId, username } = userData;
 
                 console.log(`User ${data.username} logged in successfully.`)
                 res.send({
                     status: 200,
                     content: "Login successful",
-                    authToken: authToken,
-                    expiryDate: expiryDate
+                    userId,
+                    username,
+                    authToken,
+                    expiryDate
                 })
             } else {
                 res.send({
@@ -297,9 +310,14 @@ const startServer = async () => {
 
         const existingUser = await usersModel.findOne({ username: data.username, authToken: data.authToken });
         if (existingUser) {
+            const { userId, username, authToken, expiryDate } = existingUser;
             res.send({
                 status: 200,
-                content: "User verified"
+                content: "User verified",
+                userId,
+                username,
+                authToken,
+                expiryDate
             })
         } else {
             res.send({
@@ -309,10 +327,10 @@ const startServer = async () => {
         }
     })
 
-    app.get('/projects/:username', async (req, res) => {
-        const username = req.params.username;
+    app.get('/getProjects/:userId', async (req, res) => {
+        const userId = req.params.userId;
 
-        const projects = await projectsModel.find({ projectOwner: username });
+        const projects = await projectsModel.find({ projectOwner: userId });
         if (projects) {
             res.send({
                 status: 200,
@@ -327,7 +345,7 @@ const startServer = async () => {
         }
     })
 
-    app.post('/create_project', async (req, res) => {
+    app.post('/createProject', async (req, res) => {
 
         // Find the project with the largest projectId
         const lastProject = await projectsModel
@@ -338,7 +356,8 @@ const startServer = async () => {
         const data = {
             projectId: maxProjectId + 1,  // Increment the largest projectId
             projectName: req.body.projectName,
-            projectStatus: req.body.projectStatus,
+            projectStatus: "idle",
+            projectProgress: 0,
             projectDate: new Date(),
             projectOwner: req.body.projectOwner
         }
@@ -350,6 +369,38 @@ const startServer = async () => {
             status: 200,
             content: "Project created successfully"
         })
+    })
+
+    /*
+        /getProjectDetails/:userId/:projectId?detail=###
+    */
+    app.get("/getProjectDetails/:userId/:projectId", async (req, res) => {
+        const userId = req.params.userId;
+        const projectId = req.params.projectId;
+        const detailName = req.query.detail;
+
+        const project = await projectsModel.findOne({ projectId, projectOwner: userId });
+
+        if (project) {
+            const resData = {
+                status: 200,
+                content: "Project found"
+            }
+            switch (detailName) {
+                case "status":
+                    resData.projectStatus = project.projectStatus;
+                    break;
+                case "progress":
+                    resData.progress = project.projectProgress;
+                    break;
+            }
+            res.send(resData);
+        } else {
+            res.send({
+                status: 400,
+                content: "No status found"
+            })
+        }
     })
 
     // function authenticateToken(req, res, next) {
