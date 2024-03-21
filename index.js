@@ -54,15 +54,199 @@ const startServer = async () => {
 
     const users = {};
 
-    const updateProgress = (userId, projectId, progress) => {
-        users[userId][projectId].liveProgress = progress;
+    // Because runtime restarted, reset all processing projects to idle
+    const resetProcessingDB = async () => {
+        const filter = { projectStatus: "processing" };
+        const update = { projectStatus: "error" };
+        await projectsModel.updateMany(filter, update);
+    }
+
+    await resetProcessingDB();
+
+    // Update project details in database
+    const updateProjectInDB = async (type, userId, projectId, value) => {
+        if (!users[userId]) {
+            console.log("Error: user not found in users object")
+            return;
+        }
+
+        // If project hasn't been cached, create it
+        if (!users[userId][projectId]) {
+            users[userId][projectId] = {};
+        }
+
+        // Update the progress in the database
+        const filter = { projectOwner: userId, projectId };
+        let update;
+        switch (type) {
+            case "status":
+                update = { projectStatus: value };
+                break;
+            case "progress":
+                update = { projectProgress: value };
+                break;
+        }
+        const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+        console.log(`Project [${updatedProject.projectName}] ${type} updated to ${value}.`)
+    }
+
+    const updateProgress = async (userId, projectId, progress) => {
+        if (!users[userId]) {
+            console.log("Error: user not found in users object")
+            return;
+        }
+
+        // If project hasn't been cached, create it
+        if (!users[userId][projectId]) {
+            users[userId][projectId] = {};
+        }
+
+        if (!users[userId][projectId].eventEmitter) {
+            users[userId][projectId].eventEmitter = new EventEmitter();
+        }
+
+        // users[userId][projectId].liveProgress = progress;
         // Update the progress in the database
         const filter = { projectOwner: userId, projectId };
         const update = { projectProgress: progress };
-        projectsModel.findOneAndUpdate(filter, update);
+        const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+        console.log(`Project [${updatedProject.projectName}] progress updated to ${progress}.`)
 
         users[userId][projectId].eventEmitter.emit('progress', { value: progress });
     }
+
+    // Main
+    const startReconstruct = async (userId, projectId, config) => {
+        await updateProjectInDB("status", userId, projectId, "processing");
+
+        const options = {
+            mode: 'text',
+            pythonOptions: ['-u'],
+            args: [userId, projectId]
+        };
+        if (config) {
+            const params = JSON.parse(config);
+
+            for (let key in params) {
+                options.args.push(`--${key}`);
+                options.args.push(params[key]);
+            }
+        }
+        // console.log("Options", options)
+
+        console.log("Processing in server python script...")
+        // Call the python script
+        const mainPath = path.join(localDir, 'main.py');
+        let pyshell = new PythonShell(mainPath, options);
+
+        pyshell.on('message', function (message) {
+            // console.log(message);
+            if (message.includes("main_progress")) {
+                const progress = parseInt(message.split(":")[1]);
+                updateProgress(userId, projectId, progress);
+            }
+        });
+
+        pyshell.on("pythonError", (err) => {
+            console.error(err);
+            // Reset the project status to idle
+            updateProjectInDB("status", userId, projectId, "idle");
+            updateProgress(userId, projectId, 0);
+        })
+
+        pyshell.send("start");
+
+        // end the input stream and allow the process to exit
+        pyshell.end(async function (err, code, signal) {
+            if (err) {
+                throw err;
+            }
+
+            console.log("Reconstruction process finished.")
+            updateProgress(userId, projectId, 100);
+            updateProjectInDB("status", userId, projectId, "completed");
+        });
+    }
+    //
+
+    app.post("/projectConfig", upload.none(), async (req, res) => {
+        const userId = req.body.userId;
+        const projectId = req.body.projectId;
+        const config = req.body.config;
+
+        const project = await projectsModel.findOne({ projectOwner: userId, projectId });
+
+        if (!project) {
+            res.send({
+                status: 400,
+                message: "Project not found"
+            });
+            return;
+        }
+
+        const filter = { projectOwner: userId, projectId };
+        const update = { config };
+        const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+
+        if (project.projectStatus === "config") {
+            startReconstruct(userId, projectId, config);
+        }
+
+        console.log(`Project [${project.projectName}] config updated successfully.`)
+
+        res.send({
+            status: 200,
+            message: "Project config updated successfully"
+        });
+    })
+
+    app.post('/projectUpload', upload.array('images'), async (req, res) => {
+        const action = req.body.action;
+        const userId = req.body.userId;
+        const projectId = req.body.projectId;
+
+        const project = await projectsModel.findOne({ projectOwner: userId, projectId });
+
+        if (!project) {
+            res.send({
+                status: 400,
+                message: "Project not found"
+            });
+            return;
+        }
+
+        switch (action) {
+            case "add":
+                try {
+                    await s3Uploadv3(req);
+                    const newImages = req.files.map(file => file.originalname);
+                    const updatedProject = await projectsModel.findOneAndUpdate({ projectOwner: userId, projectId }, { $push: { images: newImages } });
+                    if (project.projectStatus === "idle")
+                        updateProjectInDB("status", userId, projectId, "config");
+                } catch (err) {
+                    console.error(err);
+                    return;
+                }
+                updateProjectInDB("status", userId, projectId, "config");
+                console.log(`Project [${project.projectName}] images uploaded successfully.`)
+                break;
+            case "delete":
+                await deleteProject(req, res);
+
+                if (Image.length === 0) {
+                    updateProjectInDB("status", userId, projectId, "idle");
+                }
+                break;
+            case "list":
+                await downloadProject(req, res);
+                break;
+        }
+
+        res.send({
+            status: 200,
+            message: "File successfully uploaded to S3"
+        });
+    })
 
     app.post('/process_image/:userId/:projectId', upload.array('images'), async (req, res) => {
 
@@ -146,28 +330,45 @@ const startServer = async () => {
         const userId = req.params.userId;
         const projectId = req.params.projectId;
 
-        users[userId] = {};
-        users[userId][projectId] = {
-            eventEmitter: new EventEmitter(),
-            liveProgress: 0
-        };
+        if (!users[userId]) {
+            users[userId] = {};
+        }
+
+        if (!users[userId][projectId]) {
+            users[userId][projectId] = {};
+        }
+
+        if (!users[userId][projectId].eventEmitter) {
+            users[userId][projectId].eventEmitter = new EventEmitter();
+        }
+
+        if (!users[userId][projectId].liveProgress) {
+            users[userId][projectId].liveProgress = 0;
+        }
 
         const projectData = users[userId][projectId];
         console.log("Progress update binded received.")
         console.log("From user: " + userId)
 
+        // Initial progress update
+        res.write(`data: ${projectData.liveProgress}\n\n`);
+
         // This is just an example. Your actual progress updates would come from somewhere else.
         projectData.eventEmitter.on('progress', (progress) => {
             // Send the progress update to the client
             res.write(`data: ${progress.value}\n\n`);
+            projectData.liveProgress = progress.value;
 
             if (progress.value >= 100) {
-                res.write('data: CLOSE\n\n');
-                res.end();
+                setTimeout(() => {
+                    res.write('data: CLOSE\n\n');
+                    res.end();
+                }, 2000);
             }
         })
     }
 
+    // Live progress updates
     app.get('/process_image/:userId/:projectId', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -220,12 +421,12 @@ const startServer = async () => {
     })
 
     app.post('/register', async (req, res) => {
-        const data = {
+        const userData = {
             username: req.body.username,
             password: req.body.password
         }
 
-        const existingUser = await usersModel.findOne({ username: data.username });
+        const existingUser = await usersModel.findOne({ username: userData.username });
         if (existingUser) {
             res.send({
                 status: 400,
@@ -233,19 +434,25 @@ const startServer = async () => {
             })
         } else {
             const saltRounds = 10;
-            const hashedPassword = await bcrypt.hash(data.password, saltRounds);
+            const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
 
-            data.password = hashedPassword;
+            userData.password = hashedPassword;
 
-            const userId = data.userId = uuid.v4();
-            const username = data.username;
+            const userId = userData.userId = uuid.v4();
+            const username = userData.username;
             // update authToken
-            const authToken = data.authToken = Math.random().toString(36).substring(7);
+            const authToken = userData.authToken = Math.random().toString(36).substring(7);
             // Expire after 1 month
-            const expiryDate = data.expiryDate = new Date() + 30 * 24 * 60 * 60 * 1000;
+            const expiryDate = userData.expiryDate = new Date() + 30 * 24 * 60 * 60 * 1000;
 
-            await usersModel.insertMany(data);
-            console.log(`User ${data.username} registered successfully.`)
+            await usersModel.insertMany(userData);
+
+            // Create user in live
+            if (!users[userData.userId]) {
+                users[userData.userId] = {};
+            }
+
+            console.log(`User ${userData.username} registered successfully.`)
 
             res.send({
                 status: 200,
@@ -276,6 +483,12 @@ const startServer = async () => {
                 const filter = { username: data.username };
                 const update = { authToken, expiryDate };
                 const userData = await usersModel.findOneAndUpdate(filter, update);
+
+                // Create user in live
+                if (!users[userData.userId]) {
+                    users[userData.userId] = {};
+                }
+
                 const { userId, username } = userData;
 
                 console.log(`User ${data.username} logged in successfully.`)
@@ -311,6 +524,10 @@ const startServer = async () => {
         const existingUser = await usersModel.findOne({ username: data.username, authToken: data.authToken });
         if (existingUser) {
             const { userId, username, authToken, expiryDate } = existingUser;
+            // Create user in live
+            if (!users[userId]) {
+                users[userId] = {};
+            }
             res.send({
                 status: 200,
                 content: "User verified",
@@ -382,7 +599,7 @@ const startServer = async () => {
         const project = await projectsModel.findOne({ projectId, projectOwner: userId });
 
         if (project) {
-            const resData = {
+            let resData = {
                 status: 200,
                 content: "Project found"
             }
@@ -392,6 +609,9 @@ const startServer = async () => {
                     break;
                 case "progress":
                     resData.progress = project.projectProgress;
+                    break;
+                case "full":
+                    resData = { ...resData, project };
                     break;
             }
             res.send(resData);

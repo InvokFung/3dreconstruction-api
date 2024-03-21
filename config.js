@@ -60,7 +60,15 @@ const connectDb = async () => {
             projectOwner: {
                 type: String,
                 required: true
-            }
+            },
+            projectConfig: {
+                type: Object,
+                required: false
+            },
+            projectImages: {
+                type: Array,
+                required: false
+            },
         })
 
         const projectsModel = mongoose.model("projects", projectSchema)

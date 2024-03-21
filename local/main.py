@@ -14,6 +14,13 @@ import cv2
 
 load_dotenv()
 
+s3 = boto3.client(
+    "s3",
+    region_name=os.getenv("AWS_REGION"),
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+)
+
 
 def process_image(inputs, folder_paths):
     #
@@ -38,7 +45,7 @@ def process_image(inputs, folder_paths):
     #
     logging.info("Registering PCD fragments...")
     register_fragments(inputs, folder_paths, fragments)
-    logging.info("Done registering PCD fragments.")    
+    logging.info("Done registering PCD fragments.")
 
 
 def read_images_from_s3_folder(bucketName, folder):
@@ -72,8 +79,7 @@ def read_images_from_s3_folder(bucketName, folder):
     return images, images_names
 
 
-if __name__ == "__main__":
-
+def startMain():
     userId = sys.argv[1]
     projectId = sys.argv[2]
     # userId = 1
@@ -94,13 +100,6 @@ if __name__ == "__main__":
     project_folder = f"user-{userId}/{projectId}"
     input_folder = f"{project_folder}/rgb"
     output_folder = f"{project_folder}/output"
-
-    s3 = boto3.client(
-        "s3",
-        region_name=os.getenv("AWS_REGION"),
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
-    )
 
     images, images_names = read_images_from_s3_folder(bucketName, input_folder)
 
@@ -150,3 +149,9 @@ if __name__ == "__main__":
     log_bytes_stream = io.BytesIO(log_bytes)
     s3.upload_fileobj(log_bytes_stream, bucketName, log_output_path)
     print(f"main_progress:95")
+
+
+if __name__ == "__main__":
+    start_message = input()
+    if start_message == "start":
+        startMain()

@@ -34,8 +34,8 @@ exports.s3Uploadv3 = async (req) => {
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,        
     });
 
-    const userId = req.params.userId;
-    const projectId = 1;
+    const userId = req.body.userId;
+    const projectId = req.body.projectId;
 
     const params = req.files.map(file => {
         const userRgbPath = `user-${userId}/${projectId}/rgb/${file.originalname}`;
