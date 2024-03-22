@@ -171,6 +171,15 @@ const startServer = async () => {
         }
 
         switch (action) {
+            case "image": {
+                // Only updated string, update s3 tmr
+                const images = req.body.images;
+                const filter = { projectOwner: userId, projectId };
+                const update = { images };
+                const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+                console.log(`Project [${project.projectName}] images updated successfully.`)                
+                break;
+            }
             case "restart": {
                 const config = project.projectConfig;
                 const stringConfig = JSON.stringify(config);
