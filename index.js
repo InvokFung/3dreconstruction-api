@@ -7,7 +7,7 @@ const path = require('path');
 // const fs = require('fs');
 // const ejs = require('ejs');
 const EventEmitter = require('events');
-const { s3Uploadv3, s3Download } = require("./s3service");
+const { s3Uploadv3, s3DeleteProject } = require("./s3service");
 const bcrypt = require('bcrypt');
 const uuid = require("uuid")
 const connectDb = require("./config");
@@ -177,7 +177,8 @@ const startServer = async () => {
 
                 await updateProjectInDB("status", userId, projectId, "processing");
                 await updateProjectInDB("progress", userId, projectId, 0);
-
+                const del_params = { userId, projectId };
+                await s3DeleteProject("output", del_params);
                 startReconstruct(userId, projectId, stringConfig);
                 break;
             }
@@ -192,6 +193,8 @@ const startServer = async () => {
             case "delete": {
                 const filter = { projectOwner: userId, projectId };
                 const deletedProject = await projectsModel.findOneAndDelete(filter);
+                const del_params = { userId, projectId };
+                await s3DeleteProject("all", del_params);
                 console.log(`Project [${project.projectName}] deleted successfully.`)
                 break;
             }
