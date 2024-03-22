@@ -75,6 +75,10 @@ const startServer = async () => {
             users[userId][projectId] = {};
         }
 
+        if (!users[userId][projectId].eventEmitter) {
+            users[userId][projectId].eventEmitter = new EventEmitter();
+        }
+
         // Update the progress in the database
         const filter = { projectOwner: userId, projectId };
         let update;
@@ -88,37 +92,12 @@ const startServer = async () => {
         }
         const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
         console.log(`Project [${updatedProject.projectName}] ${type} updated to ${value}.`)
-    }
 
-    const updateProgress = async (userId, projectId, progress) => {
-        if (!users[userId]) {
-            console.log("Error: user not found in users object")
-            return;
-        }
-
-        // If project hasn't been cached, create it
-        if (!users[userId][projectId]) {
-            users[userId][projectId] = {};
-        }
-
-        if (!users[userId][projectId].eventEmitter) {
-            users[userId][projectId].eventEmitter = new EventEmitter();
-        }
-
-        // users[userId][projectId].liveProgress = progress;
-        // Update the progress in the database
-        const filter = { projectOwner: userId, projectId };
-        const update = { projectProgress: progress };
-        const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
-        console.log(`Project [${updatedProject.projectName}] progress updated to ${progress}.`)
-
-        users[userId][projectId].eventEmitter.emit('progress', { value: progress });
+        users[userId][projectId].eventEmitter.emit(type, { value });
     }
 
     // Main
     const startReconstruct = async (userId, projectId, config) => {
-        await updateProjectInDB("status", userId, projectId, "processing");
-
         const options = {
             mode: 'text',
             pythonOptions: ['-u'],
@@ -139,19 +118,26 @@ const startServer = async () => {
         const mainPath = path.join(localDir, 'main.py');
         let pyshell = new PythonShell(mainPath, options);
 
+        //
+        let updateQueue = Promise.resolve();
+
+        function queueUpdate(field, userId, projectId, value) {
+            updateQueue = updateQueue.then(() => updateProjectInDB(field, userId, projectId, value));
+        }
+
         pyshell.on('message', function (message) {
             // console.log(message);
             if (message.includes("main_progress")) {
                 const progress = parseInt(message.split(":")[1]);
-                updateProgress(userId, projectId, progress);
+                queueUpdate("progress", userId, projectId, progress);
             }
         });
 
         pyshell.on("pythonError", (err) => {
             console.error(err);
             // Reset the project status to idle
-            updateProjectInDB("status", userId, projectId, "idle");
-            updateProgress(userId, projectId, 0);
+            queueUpdate("status", userId, projectId, "idle");
+            queueUpdate("progress", userId, projectId, 0);
         })
 
         pyshell.send("start");
@@ -163,11 +149,59 @@ const startServer = async () => {
             }
 
             console.log("Reconstruction process finished.")
-            updateProgress(userId, projectId, 100);
-            updateProjectInDB("status", userId, projectId, "completed");
+            queueUpdate("progress", userId, projectId, 100);
+            queueUpdate("status", userId, projectId, "completed");
         });
     }
     //
+
+    app.post("/projectUpdate", upload.none(), async (req, res) => {
+        const userId = req.body.userId;
+        const projectId = req.body.projectId;
+        const action = req.body.action;
+
+        const project = await projectsModel.findOne({ projectOwner: userId, projectId });
+
+        if (!project) {
+            res.send({
+                status: 400,
+                message: "Project not found"
+            });
+            return;
+        }
+
+        switch (action) {
+            case "restart": {
+                const config = project.projectConfig;
+                const stringConfig = JSON.stringify(config);
+
+                await updateProjectInDB("status", userId, projectId, "processing");
+                await updateProjectInDB("progress", userId, projectId, 0);
+
+                startReconstruct(userId, projectId, stringConfig);
+                break;
+            }
+            case "rename": {
+                const projectName = req.body.projectName;
+                const filter = { projectOwner: userId, projectId };
+                const update = { projectName };
+                const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+                console.log(`Project [${project.projectName}] renamed to ${projectName}.`)
+                break;
+            }
+            case "delete": {
+                const filter = { projectOwner: userId, projectId };
+                const deletedProject = await projectsModel.findOneAndDelete(filter);
+                console.log(`Project [${project.projectName}] deleted successfully.`)
+                break;
+            }
+        }
+
+        res.send({
+            status: 200,
+            message: "Project status updated successfully"
+        });
+    })
 
     app.post("/projectConfig", upload.none(), async (req, res) => {
         const userId = req.body.userId;
@@ -183,12 +217,17 @@ const startServer = async () => {
             });
             return;
         }
+        const parseConfig = JSON.parse(config);
 
         const filter = { projectOwner: userId, projectId };
-        const update = { config };
+        const update = { projectConfig: parseConfig };
         const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+        console.log(updatedProject)
 
         if (project.projectStatus === "config") {
+            await updateProjectInDB("status", userId, projectId, "processing");
+            await updateProjectInDB("progress", userId, projectId, 0);
+
             startReconstruct(userId, projectId, config);
         }
 
@@ -227,7 +266,6 @@ const startServer = async () => {
                     console.error(err);
                     return;
                 }
-                updateProjectInDB("status", userId, projectId, "config");
                 console.log(`Project [${project.projectName}] images uploaded successfully.`)
                 break;
             case "delete":
@@ -260,7 +298,7 @@ const startServer = async () => {
         console.log("Project ID: " + projectId);
 
         // Start the progress at 0    
-        updateProgress(userId, projectId, 0);
+        updateProjectInDB("progress", userId, projectId, 0);
 
         //
         const options = { args: [userId, projectId] };
@@ -274,7 +312,7 @@ const startServer = async () => {
         }
         console.log("Options", options)
 
-        updateProgress(userId, projectId, 10);
+        updateProjectInDB("progress", userId, projectId, 10);
         console.log("Uploading files to S3...")
         try {
             await s3Uploadv3(req);
@@ -283,7 +321,7 @@ const startServer = async () => {
             return;
         }
         console.log("File successfully uploaded to S3")
-        updateProgress(userId, projectId, 20);
+        updateProjectInDB("progress", userId, projectId, 20);
 
         console.log("Processing in server python script...")
         // Call the python script
@@ -296,7 +334,7 @@ const startServer = async () => {
             // Progress range 30-90
             if (message.includes("main_progress")) {
                 const progress = parseInt(message.split(":")[1]);
-                updateProgress(userId, projectId, progress);
+                updateProjectInDB("progress", userId, projectId, progress);
             }
         });
 
@@ -307,7 +345,7 @@ const startServer = async () => {
             }
 
             console.log("Reconstruction process finished.")
-            updateProgress(userId, projectId, 100);
+            updateProjectInDB("progress", userId, projectId, 100);
             res.send({
                 code: 200
             });

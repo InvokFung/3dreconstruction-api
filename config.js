@@ -62,7 +62,8 @@ const connectDb = async () => {
                 required: true
             },
             projectConfig: {
-                type: Object,
+                type: Map,
+                of: Number,
                 required: false
             },
             projectImages: {
