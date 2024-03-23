@@ -171,13 +171,22 @@ const startServer = async () => {
         }
 
         switch (action) {
+            case "config": {
+                const config = req.body.config;
+                const parseConfig = JSON.parse(config);
+                const filter = { projectOwner: userId, projectId };
+                const update = { projectConfig: parseConfig };
+                const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+                console.log(`Project [${project.projectName}] config updated successfully.`)
+                break;
+            }
             case "image": {
                 // Only updated string, update s3 tmr
                 const images = req.body.images;
                 const filter = { projectOwner: userId, projectId };
                 const update = { images };
                 const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
-                console.log(`Project [${project.projectName}] images updated successfully.`)                
+                console.log(`Project [${project.projectName}] images updated successfully.`)
                 break;
             }
             case "restart": {
@@ -659,6 +668,9 @@ const startServer = async () => {
                     break;
                 case "progress":
                     resData.progress = project.projectProgress;
+                    break;
+                case "config":
+                    resData.projectConfig = project.projectConfig;
                     break;
                 case "full":
                     resData = { ...resData, project };
