@@ -49,6 +49,49 @@ exports.s3Uploadv3 = async (req) => {
     return await Promise.all(params.map(param => s3client.send(new PutObjectCommand(param))))
 }
 
+exports.s3UploadImages = async (userId, projectId, uploadImages) => {
+    const s3client = new S3Client({
+        region: process.env.AWS_REGION,
+        credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        }
+    });
+
+    const params = uploadImages.map(file => {
+        const userRgbPath = `user-${userId}/${projectId}/rgb/${file.originalname}`;
+        return {
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: userRgbPath,
+            Body: file.buffer,
+        }
+    })
+
+    return await Promise.all(params.map(param => s3client.send(new PutObjectCommand(param))))
+}
+
+exports.s3DeleteImages = async (userId, projectId, deleteImages) => {
+    const s3client = new S3Client({
+        region: process.env.AWS_REGION,
+        credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        }
+    });
+
+    const params = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Delete: {
+            Objects: deleteImages.map(fileName => {
+                const userRgbPath = `user-${userId}/${projectId}/rgb/${fileName}`;
+                return { Key: userRgbPath };
+            })
+        }
+    };
+
+    return await s3client.send(new DeleteObjectsCommand(params));
+}
+
 // exports.s3Download = async (req) => {
 //     const s3 = new S3();
 
@@ -130,7 +173,7 @@ async function deleteObjectsWithPrefixV3(bucket, prefix) {
             accessKeyId: process.env.AWS_ACCESS_KEY_ID,
             secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
         }
-    });    
+    });
 
     const listedObjects = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }));
 
@@ -150,14 +193,14 @@ async function deleteObjectsWithPrefixV3(bucket, prefix) {
     });
 
     const response = await s3.send(new DeleteObjectsCommand(deleteParams));
-    
+
     if (response.Errors) {
         console.log("Failed to delete:", response.Errors);
         return;
     }
 
     if (listedObjects.IsTruncated) await deleteObjectsWithPrefix(bucket, prefix);
-    
+
     // const listedObjectsAfterDelete = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }));
     // console.log("Objects after delete:", listedObjectsAfterDelete.Contents);
 

@@ -7,7 +7,12 @@ const path = require('path');
 // const fs = require('fs');
 // const ejs = require('ejs');
 const EventEmitter = require('events');
-const { s3Uploadv3, s3DeleteProject } = require("./s3service");
+const {
+    s3Uploadv3,
+    s3DeleteProject,
+    s3UploadImages,
+    s3DeleteImages
+} = require("./s3service");
 const bcrypt = require('bcrypt');
 const uuid = require("uuid")
 const connectDb = require("./config");
@@ -155,7 +160,34 @@ const startServer = async () => {
     }
     //
 
-    app.post("/projectUpdate", upload.none(), async (req, res) => {
+    const updateProjectImage = async (userId, projectId, project, updateImages) => {
+
+        // Get the existing image names
+        const existingImageNames = project.projectImages;
+
+        // Get the new image names
+        const updateImageNames = updateImages.map(image => image.originalname);
+
+        // File name string
+        const imagesNameToDelete = existingImageNames.filter(name => !updateImageNames.includes(name));
+
+        // File objects
+        const imagesToUpload = updateImages.filter(image => !existingImageNames.includes(image.originalname));
+
+        if (imagesNameToDelete.length > 0) {
+            await s3DeleteImages(userId, projectId, imagesNameToDelete);
+        }
+
+        if (imagesToUpload.length > 0) {
+            await s3UploadImages(userId, projectId, imagesToUpload);
+        }
+
+        const filter = { projectOwner: userId, projectId };
+        const update = { projectImages: updateImageNames };
+        const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+    }
+
+    app.post("/projectUpdate", upload.array('images'), async (req, res) => {
         const userId = req.body.userId;
         const projectId = req.body.projectId;
         const action = req.body.action;
@@ -181,12 +213,16 @@ const startServer = async () => {
                 break;
             }
             case "image": {
-                // Only updated string, update s3 tmr
-                const images = req.body.images;
-                const filter = { projectOwner: userId, projectId };
-                const update = { images };
-                const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+                await updateProjectImage(userId, projectId, project, req.files);
                 console.log(`Project [${project.projectName}] images updated successfully.`)
+                break;
+            }
+            case "status": {
+                const status = req.body.status;
+                const filter = { projectOwner: userId, projectId };
+                const update = { projectStatus: status };
+                const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
+                console.log(`Project [${project.projectName}] status updated to ${status}.`)
                 break;
             }
             case "restart": {
@@ -261,7 +297,6 @@ const startServer = async () => {
     })
 
     app.post('/projectUpload', upload.array('images'), async (req, res) => {
-        const action = req.body.action;
         const userId = req.body.userId;
         const projectId = req.body.projectId;
 
@@ -275,31 +310,12 @@ const startServer = async () => {
             return;
         }
 
-        switch (action) {
-            case "add":
-                try {
-                    await s3Uploadv3(req);
-                    const newImages = req.files.map(file => file.originalname);
-                    const updatedProject = await projectsModel.findOneAndUpdate({ projectOwner: userId, projectId }, { $push: { images: newImages } });
-                    if (project.projectStatus === "idle")
-                        updateProjectInDB("status", userId, projectId, "config");
-                } catch (err) {
-                    console.error(err);
-                    return;
-                }
-                console.log(`Project [${project.projectName}] images uploaded successfully.`)
-                break;
-            case "delete":
-                await deleteProject(req, res);
+        await updateProjectImage(userId, projectId, project, req.files);
 
-                if (Image.length === 0) {
-                    updateProjectInDB("status", userId, projectId, "idle");
-                }
-                break;
-            case "list":
-                await downloadProject(req, res);
-                break;
-        }
+        if (project.projectStatus === "idle")
+            updateProjectInDB("status", userId, projectId, "config");
+
+        console.log(`Project [${project.projectName}] images uploaded successfully.`)
 
         res.send({
             status: 200,
