@@ -1,4 +1,6 @@
 require("dotenv").config();
+const https = require('https');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -16,6 +18,12 @@ const {
 const bcrypt = require('bcrypt');
 const uuid = require("uuid")
 const connectDb = require("./config");
+
+// Provide your SSL certificate and key
+const server_options = {
+    key: fs.readFileSync('./certificate/privkey.pem'),
+    cert: fs.readFileSync('./certificate/cert.pem')
+};
 
 const startServer = async () => {
     // Wait till the database is connected
@@ -591,6 +599,10 @@ const startServer = async () => {
     })
 
     app.get('/verify/:username/:authToken', async (req, res) => {
+        console.log("Verifying user...")
+        // Display req ip
+        console.log(`Request from ip: ${req.ip}`);
+
         const data = {
             username: req.params.username,
             authToken: req.params.authToken
@@ -716,7 +728,9 @@ const startServer = async () => {
     // }
 
     app.listen(3000, () => console.log('Server started on port 3000'));
-
+    https.createServer(server_options, app).listen(4000, () => {
+        console.log('Https Server started on port 4000');
+    });
     // const allowCors = fn => async (req, res) => {
     //     res.setHeader('Access-Control-Allow-Credentials', true)
     //     res.setHeader('Access-Control-Allow-Origin', '*')
