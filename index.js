@@ -149,7 +149,7 @@ const startServer = async () => {
         pyshell.on("pythonError", (err) => {
             console.error(err);
             // Reset the project status to idle
-            queueUpdate("status", userId, projectId, "idle");
+            queueUpdate("status", userId, projectId, "error");
             queueUpdate("progress", userId, projectId, 0);
         })
 
@@ -237,7 +237,7 @@ const startServer = async () => {
                 const config = project.projectConfig;
                 const stringConfig = JSON.stringify(config);
 
-                await updateProjectInDB("status", userId, projectId, "processing");
+                await updateProjectInDB("status", userId, projectId, "processing");                
                 await updateProjectInDB("progress", userId, projectId, 0);
                 const del_params = { userId, projectId };
                 await s3DeleteProject("output", del_params);
@@ -409,9 +409,17 @@ const startServer = async () => {
         });
     });
 
-    function sendProgressUpdates(req, res) {
+    async function sendProgressUpdates(req, res) {
         const userId = req.params.userId;
         const projectId = req.params.projectId;
+
+        const project = await projectsModel.findOne({ projectOwner: userId, projectId });
+
+        if (project.projectStatus != "processing") {
+            res.write('data: CLOSE\n\n');
+            res.end();
+            return;
+        }
 
         if (!users[userId]) {
             users[userId] = {};
