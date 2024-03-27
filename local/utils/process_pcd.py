@@ -186,12 +186,15 @@ def register_fragments(inputs, folder_paths, fragments):
         accumulated_pcd.points.extend(transformed_pcd.points)
         accumulated_pcd.colors.extend(transformed_pcd.colors)
     # o3d.visualization.draw_geometries([accumulated_pcd])
+        
+    cl, ind = accumulated_pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.0)
+    pcd_filtered = accumulated_pcd.select_by_index(ind)
 
     print("Saving pointclouds to numpy array...")
     # Convert Open3D point cloud to NumPy arrays for points and colors
     
-    points = np.asarray(accumulated_pcd.points)
-    colors = np.asarray(accumulated_pcd.colors)
+    points = np.asarray(pcd_filtered.points)
+    colors = np.asarray(pcd_filtered.colors)
 
     # Combine points and colors into a single NumPy array
     # Assuming both points and colors have the same number of elements
