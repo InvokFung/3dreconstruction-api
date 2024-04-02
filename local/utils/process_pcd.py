@@ -12,24 +12,40 @@ import open3d as o3d
 o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Error)
 
 depth_scaling_factor = 1000
-fx, fy = 520, 520
-cx = 320
-cy = 240
+# fx, fy = 520, 520
+# cx = 320
+# cy = 240
 
 
 def generate_fragments(inputs, folder_paths):
     images = inputs["images"]
     depthMaps = inputs["depthMaps"]
+    params = inputs["params"]
     fragments = []
 
+    progress_per_image = 25 / len(images)
+    current_progress = 45
+
     for i in range(len(images)):
-        fragment = generate_single_fragment(images[i], depthMaps[i])
+        fragment = generate_single_fragment(images[i], depthMaps[i], params)
         fragments.append(fragment)
+        current_progress += progress_per_image
+        print(f"main_progress:{current_progress}")
 
     return fragments
 
 
-def generate_single_fragment(image, depthMap):
+def generate_single_fragment(image, depthMap, params):
+    fx = params.get("fx", 520)
+    fy = params.get("fy", 520)
+
+    image_height, image_width = image.shape[:2]
+    cx = params.get("cx", image_width / 2)
+    cy = params.get("cy", image_height / 2)
+    print(f"fx: {fx}, fy: {fy}")
+    print(f"cx: {cx}, cy: {cy}")
+    print(f"{params.get('depthMin', 60)} - {params.get('depthMax', 140)}")
+
     img = image
 
     min_val = np.min(depthMap)
@@ -38,13 +54,13 @@ def generate_single_fragment(image, depthMap):
     # depth = (depthMap * 255 / np.max(depthMap)).astype('uint8')
 
     # Front
-    threshold = 140
+    threshold = params.get("depthMax", 140)
     # threshold = 200
     idx = np.where(depth > threshold)
     depth[idx] = 0
 
     # Back
-    threshold = 60
+    threshold = params.get('depthMin', 60)
     # threshold = 30
     idx = np.where(depth < threshold)
     depth[idx] = 0
@@ -182,17 +198,19 @@ def register_fragments(inputs, folder_paths, fragments):
         # accumulated_pcd += origin_pcds[point_id].transform(
         #     pose_graph.nodes[point_id].pose
         # )
-        transformed_pcd = origin_pcds[point_id].transform(pose_graph.nodes[point_id].pose)
+        transformed_pcd = origin_pcds[point_id].transform(
+            pose_graph.nodes[point_id].pose
+        )
         accumulated_pcd.points.extend(transformed_pcd.points)
         accumulated_pcd.colors.extend(transformed_pcd.colors)
     # o3d.visualization.draw_geometries([accumulated_pcd])
-        
+
     cl, ind = accumulated_pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.0)
     pcd_filtered = accumulated_pcd.select_by_index(ind)
 
     print("Saving pointclouds to numpy array...")
     # Convert Open3D point cloud to NumPy arrays for points and colors
-    
+
     points = np.asarray(pcd_filtered.points)
     colors = np.asarray(pcd_filtered.colors)
 
@@ -209,7 +227,6 @@ def register_fragments(inputs, folder_paths, fragments):
     np.save(bytes_buffer, point_cloud_data)
     bytes_buffer.seek(0)  # Reset buffer position to the beginning
 
-    
     s3 = inputs["s3"]
     bucketName = inputs["bucketName"]
     output_folder = folder_paths["output"]

@@ -13,6 +13,8 @@ def pairwise_registration(
 
     source.estimate_normals()
     target.estimate_normals()
+    # source.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    # target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
     # print("Apply point-to-plane ICP")
     icp_coarse = o3d.pipelines.registration.registration_icp(

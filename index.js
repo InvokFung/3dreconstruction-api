@@ -139,7 +139,7 @@ const startServer = async () => {
         }
 
         pyshell.on('message', function (message) {
-            // console.log(message);
+            console.log(message);
             if (message.includes("main_progress")) {
                 const progress = parseInt(message.split(":")[1]);
                 queueUpdate("progress", userId, projectId, progress);
@@ -288,6 +288,7 @@ const startServer = async () => {
         const update = { projectConfig: parseConfig };
         const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
         console.log(updatedProject)
+        console.log(parseConfig)
 
         if (project.projectStatus === "config") {
             await updateProjectInDB("status", userId, projectId, "processing");

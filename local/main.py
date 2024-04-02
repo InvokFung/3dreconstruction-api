@@ -86,14 +86,15 @@ def startMain():
     # projectId = 1
 
     # Default parameters
-    params = {
-        "depthMin": 0,
-        "depthMax": 100,
-        "fx": 1000,
-        "fy": 1000,
-        "cx": 320,
-        "cy": 247,
-    }
+    params = {}
+    # params = {
+    #     "depthMin": 60,
+    #     "depthMax": 140,
+    #     "fx": 520,
+    #     "fy": 520,
+    #     "cx": 320,
+    #     "cy": 240,
+    # }
 
     bucketName = os.getenv("AWS_BUCKET_NAME")
 
@@ -128,6 +129,7 @@ def startMain():
         "bucketName": bucketName,
         "images": images,
         "images_names": images_names,
+        "params": params,
     }
 
     folder_paths = {
