@@ -9,7 +9,7 @@ transform = None
 def initialize():
     global model, device, transform
 
-    model_type = "DPT_Large"
+    model_type = "DPT_Large"    
     model = torch.hub.load("intel-isl/MiDaS", model_type)
     model.eval()
 

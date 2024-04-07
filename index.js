@@ -79,8 +79,7 @@ const startServer = async () => {
     // Update project details in database
     const updateProjectInDB = async (type, userId, projectId, value) => {
         if (!users[userId]) {
-            console.log("Error: user not found in users object")
-            return;
+            users[userId] = {};
         }
 
         // If project hasn't been cached, create it
@@ -237,7 +236,7 @@ const startServer = async () => {
                 const config = project.projectConfig;
                 const stringConfig = JSON.stringify(config);
 
-                await updateProjectInDB("status", userId, projectId, "processing");                
+                await updateProjectInDB("status", userId, projectId, "processing");
                 await updateProjectInDB("progress", userId, projectId, 0);
                 const del_params = { userId, projectId };
                 await s3DeleteProject("output", del_params);
