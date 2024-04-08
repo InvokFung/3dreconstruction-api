@@ -108,8 +108,8 @@ def generate_single_fragment(image, depthMap, params):
     # eps = 1.5  # 同一Cluster中點與點之間允許的最大距離
     # min_points = 50  # 每個Cluster至少有min_points個點才成立
     # eps = 0.004
-    eps = 0.0045
-    min_points = 500
+    eps = params.get("eps", 0.0045)
+    min_points = params.get("minPts", 500)
 
     with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
         labels = np.array(down_pcd.cluster_dbscan(eps, min_points, print_progress=True))

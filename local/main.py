@@ -106,13 +106,17 @@ def startMain():
 
     print(f"main_progress:30")
 
+    print(f"Loading params...")
+
     # Read command line arguments
     for i in range(3, len(sys.argv), 2):
         arg = sys.argv[i]
         if arg.startswith("--"):
             param_name = arg[2:]
-            if param_name in params and float(sys.argv[i + 1]) != 0:
+            if float(sys.argv[i + 1]) != -1:
                 params[param_name] = float(sys.argv[i + 1])
+
+    print(params)
 
     # Print parameters
     for name, value in params.items():

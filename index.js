@@ -104,8 +104,12 @@ const startServer = async () => {
         }
         const updatedProject = await projectsModel.findOneAndUpdate(filter, update);
         console.log(`Project [${updatedProject.projectName}] ${type} updated to ${value}.`)
-
+        
         users[userId][projectId].eventEmitter.emit(type, { value });
+        // Send error to frontend listener
+        if (type === "status" && value === "error") {
+            users[userId][projectId].eventEmitter.emit("error", { value });
+        }
     }
 
     // Main
@@ -157,7 +161,8 @@ const startServer = async () => {
         // end the input stream and allow the process to exit
         pyshell.end(async function (err, code, signal) {
             if (err) {
-                throw err;
+                console.log(err);
+                return;
             }
 
             console.log("Reconstruction process finished.")
@@ -444,6 +449,11 @@ const startServer = async () => {
         // Initial progress update
         res.write(`data: ${projectData.liveProgress}\n\n`);
 
+        projectData.eventEmitter.on('error', (progress) => {
+            res.write('data: CLOSE\n\n');
+            res.end();
+        })
+
         // This is just an example. Your actual progress updates would come from somewhere else.
         projectData.eventEmitter.on('progress', (progress) => {
             // Send the progress update to the client
@@ -501,13 +511,7 @@ const startServer = async () => {
 
     app.get('/', (req, res) => {
         res.json({
-            hello: 'hi3!'
-        });
-    })
-
-    app.get('/test', (req, res) => {
-        res.json({
-            hello: 'hi4!'
+            hello: 'hello!'
         });
     })
 
