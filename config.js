@@ -41,10 +41,6 @@ const connectDb = async () => {
                 type: String,
                 required: true
             },
-            // projectLocation: {
-            //     type: String,
-            //     required: true
-            // },
             projectStatus: {
                 type: String,
                 required: true

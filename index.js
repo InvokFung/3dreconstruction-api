@@ -399,18 +399,6 @@ const startServer = async () => {
             res.send({
                 code: 200
             });
-            // console.log("Server accessing result...")
-            // try {
-            //     const npyBody = (await s3Download(req)).Body;
-            //     // Set response headers
-            //     res.setHeader('Content-Type', 'application/octet-stream');
-            //     res.setHeader('Content-Disposition', 'attachment; filename="accumulated_numpy.npy"');
-            //     // Send the file data as a binary stream
-            //     res.send(npyBody);
-            //     console.log("Result sent to client.")
-            // } catch (err) {
-            //     console.error(err);
-            // }
         });
     });
 
