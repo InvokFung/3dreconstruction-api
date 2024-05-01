@@ -1,5 +1,4 @@
 const express = require("express");
-const { connectDb, getDb } = require("./database");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -56,6 +55,11 @@ app.get("/auth-endpoint", authenticateToken, (request, response) => {
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
+
+app.post("/test", (req, res) => {
+  console.log(req.body);
+  res.send("Test successful.");
+})
 
 app.get("/doctor-info/:doctorAddress", async (req, res) => {
   const { doctorAddress } = req.params;
